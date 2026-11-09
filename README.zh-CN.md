@@ -33,7 +33,7 @@
 - 可选重力：右键「掉到任务栏（重力）」，狐狸会往下掉，直到爪子搭在任务栏上；拖动时暂停，松手继续。
 - 右键菜单：打开书桌、写点东西、换皮肤、调整大小、视角、嘴里叼着、睡觉 / 叫醒、重力、音效、始终置顶、退出。
 
-| ![大小条](docs/screenshot-size.png) | ![视角条](docs/screenshot-view.png) |
+| ![大小条](docs/screenshot-size-zh.png) | ![视角条](docs/screenshot-view.png) |
 | --- | --- |
 | 只有狐狸在缩放 | 左右、上下两根滑条 |
 
