@@ -178,5 +178,11 @@
   "set.balanceLoading": "查询中…",
   "set.saving": "保存中…",
   "set.needKey": "先填 API Key",
-  "set.connected": "连接正常：{text}"
+  "set.connected": "连接正常：{text}",
+  "persona.朋友": "朋友",
+  "persona.同事": "同事",
+  "persona.心动对象": "心动对象",
+  "persona.幽默损友": "幽默损友",
+  "persona.长辈": "长辈",
+  "persona.客服": "客服"
 }

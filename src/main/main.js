@@ -462,7 +462,9 @@ function localizedItems() {
 }
 
 function localizedPersonas() {
-  return ai.PERSONAS;
+  const out = {};
+  for (const key of Object.keys(ai.PERSONAS)) out[key] = i18n.t(`persona.${key}`);
+  return out;
 }
 
 /* ------------------------------------------------------------------ pet menu */

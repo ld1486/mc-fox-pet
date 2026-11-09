@@ -178,5 +178,11 @@
   "set.balanceLoading": "Checking…",
   "set.saving": "Saving…",
   "set.needKey": "Add an API key first",
-  "set.connected": "Connected: {text}"
+  "set.connected": "Connected: {text}",
+  "persona.朋友": "Friend",
+  "persona.同事": "Colleague",
+  "persona.心动对象": "Someone I like",
+  "persona.幽默损友": "Snarky friend",
+  "persona.长辈": "Elder relative",
+  "persona.客服": "Customer support"
 }
