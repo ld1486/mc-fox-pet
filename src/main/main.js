@@ -45,14 +45,23 @@ function petBounds() {
   return { ...PET_WIN };
 }
 
+/* Where the fox itself sits inside the window, as fractions of its size. The
+ * window is much bigger than the fox (it has to fit the 200 % size setting), so
+ * keeping the *window* on screen would stop the fox from ever reaching the top
+ * of the display and would yank it back down on release. Clamp the fox instead:
+ * as long as its centre is on screen the window may hang off the edges freely. */
+const FOX_IN_WIN = { cx: 0.5, cy: 0.49 };
+
 function clampToDisplay(x, y, w, h) {
-  const display = screen.getDisplayNearestPoint({ x: Math.round(x + w / 2), y: Math.round(y + h / 2) });
+  const foxX = x + w * FOX_IN_WIN.cx;
+  const foxY = y + h * FOX_IN_WIN.cy;
+  const display = screen.getDisplayNearestPoint({ x: Math.round(foxX), y: Math.round(foxY) });
   const wa = display.workArea;
-  /* The window is a fixed size now, so keep all of it on screen — a stray
-   * window edge is what would let the fox wander off the display. */
+  const cx = Math.min(Math.max(foxX, wa.x), wa.x + wa.width);
+  const cy = Math.min(Math.max(foxY, wa.y), wa.y + wa.height);
   return {
-    x: Math.round(Math.min(Math.max(x, wa.x), wa.x + wa.width - w)),
-    y: Math.round(Math.min(Math.max(y, wa.y), wa.y + wa.height - h)),
+    x: Math.round(x + (cx - foxX)),
+    y: Math.round(y + (cy - foxY)),
   };
 }
 
@@ -143,16 +152,21 @@ function createPetWindow() {
   win.setAlwaysOnTop(!!cfg.alwaysOnTop, 'screen-saver');
   win.setIgnoreMouseEvents(true, { forward: true });
   /* Windows can resize this frameless transparent window on its own when the
-   * mouse button goes down (Aero Snap / DPI negotiation). The pet must stay the
-   * size it was built with, so snap it back whenever the OS drifts far from it.
-   * A few pixels of error are normal rounding on fractional DPI displays. */
+   * mouse button goes down (Aero Snap / DPI negotiation) and SetWindowPos can
+   * drift the size by a pixel now and then. The pet must stay the size it was
+   * built with, so snap it back as soon as it drifts. */
   petSize = { width: win.getBounds().width, height: win.getBounds().height };
+  let fixing = false;
   win.on('resize', () => {
-    if (win.isDestroyed() || !petSize) return;
+    if (win.isDestroyed() || !petSize || fixing) return;
     const b = win.getBounds();
-    if (Math.abs(b.width - petSize.width) > 8 || Math.abs(b.height - petSize.height) > 8) {
+    if (b.width !== petSize.width || b.height !== petSize.height) {
       console.log('[pet] resize guard', JSON.stringify(b), '->', petSize.width, petSize.height);
+      fixing = true;
       win.setBounds({ x: b.x, y: b.y, width: petSize.width, height: petSize.height });
+      setTimeout(() => {
+        fixing = false;
+      }, 40);
     }
   });
   win.loadURL(`pet://app/src/renderer/pet/index.html${query}`);
@@ -317,15 +331,20 @@ function broadcast(channel, payload) {
 }
 
 /* ------------------------------------------------------------------- dragging */
+/* Dev-only: --pet-drag-sim replaces the real cursor with a synthetic one so the
+ * drag maths can be exercised without OS-level input. */
+let simCursor = null;
+const cursorPoint = () => simCursor || screen.getCursorScreenPoint();
+
 function startDrag() {
   if (!petWin || dragTimer) return;
   stopFall();
   const [sx, sy] = petWin.getPosition();
-  const cur = screen.getCursorScreenPoint();
+  const cur = cursorPoint();
   dragInfo = { sx, sy, cx: cur.x, cy: cur.y, lx: cur.x, t: Date.now(), px: null, py: null };
   dragTimer = setInterval(() => {
     if (!petWin || !dragInfo) return;
-    const p = screen.getCursorScreenPoint();
+    const p = cursorPoint();
     /* Skip SetWindowPos when the cursor did not move: hammering the window
      * position with identical bounds makes Windows resize it occasionally. */
     const nx = Math.round(dragInfo.sx + p.x - dragInfo.cx);
@@ -334,8 +353,7 @@ function startDrag() {
       dragInfo.px = nx;
       dragInfo.py = ny;
       petWin.setPosition(nx, ny);
-    }
-    const now = Date.now();
+    }    const now = Date.now();
     const dt = Math.max(16, now - dragInfo.t) / 1000;
     const vx = (p.x - dragInfo.lx) / dt;
     dragInfo.lx = p.x;
@@ -796,6 +814,7 @@ if (!gotLock) {
     registerHotkeys();
     if (store.get().gravity) setTimeout(startFall, 600);
     if (flag('panel-shot')) createPanelWindow();
+    if (flag('pet-drag-sim')) runDragSim();
     if (!flag('shot') && !flag('panel-shot')) {
       // panel stays closed until asked; give a hint on first run
       if (!store.get().api.apiKey) openPanel('settings');
@@ -809,6 +828,45 @@ if (!gotLock) {
       store.set({ petX: x, petY: y });
     }
   });
+}
+
+/* Dev-only: emulate a real upward drag — the cursor starts on the fox, walks up
+ * until it reaches the top of the screen (a real cursor cannot go further), is
+ * held there, then released. Logs the bounds so a release-snap is obvious. */
+function runDragSim() {
+  const steps = Number(flag('pet-drag-sim')) || 90;
+  setTimeout(() => {
+    const area = screen.getDisplayMatching(petWin.getBounds()).workArea;
+    const b = petWin.getBounds();
+    petWin.setPosition(Math.round(area.x + (area.width - b.width) / 2), Math.round(area.y + area.height - b.height * 0.88));
+    const wb = petWin.getBounds();
+    const start = { x: Math.round(wb.x + wb.width * 0.5), y: Math.round(wb.y + wb.height * 0.5) };
+    console.log('[simdrag] window', JSON.stringify(wb), 'cursor', JSON.stringify(start));
+    simCursor = { ...start };
+    startDrag();
+    let i = 0;
+    const walk = setInterval(() => {
+      i += 1;
+      /* one screen-height of travel at most, then hold at the top edge */
+      simCursor = { x: start.x, y: Math.max(area.y, start.y - i * 12) };
+      if (i % 10 === 0) {
+        const nb = petWin.getBounds();
+        console.log('[simdrag]', i, 'cursorY', simCursor.y, 'winY', nb.y, 'delta', nb.y - wb.y);
+      }
+      if (i >= steps) {
+        clearInterval(walk);
+        const before = petWin.getBounds();
+        simCursor = null;
+        stopDrag();
+        const after = petWin.getBounds();
+        console.log('[simdrag] release before', JSON.stringify(before), 'after', JSON.stringify(after));
+        setTimeout(() => {
+          console.log('[simdrag] settled', JSON.stringify(petWin.getBounds()));
+          app.exit(0);
+        }, 1200);
+      }
+    }, 16);
+  }, 1800);
 }
 
 module.exports = { openPanel };

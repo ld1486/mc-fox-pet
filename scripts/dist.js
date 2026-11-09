@@ -16,13 +16,18 @@ const node = process.execPath;
 const cli = path.join(root, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js');
 
 const name = lang === 'en' ? 'Fox Desk' : '狐狸书桌';
+/* electron-builder builds and then runs the uninstaller through a path that is
+ * derived from productName. A space in it ("Fox Desk") makes that spawn fail
+ * with `spawn UNKNOWN`, so the installer is built under a space-free product
+ * name and only the display name / packaged metadata keep the space. */
+const productName = lang === 'en' ? 'FoxDesk' : '狐狸书桌';
 const artifact = `fox-desk-${lang === 'en' ? 'en-' : ''}setup-\${version}.\${ext}`;
 
 const args = [
   cli,
   '--win',
   'nsis',
-  '-c.productName=' + name,
+  '-c.productName=' + productName,
   '-c.extraMetadata.defaultLang=' + lang,
   '-c.extraMetadata.productName=' + name,
   '-c.win.artifactName=' + artifact,
