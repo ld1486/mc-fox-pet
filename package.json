@@ -1,0 +1,73 @@
+{
+  "name": "mc-fox-pet",
+  "version": "1.0.0",
+  "private": true,
+  "defaultLang": "zh",
+  "description": "Minecraft fox desktop pet with a writing / chat desk (中文 / English)",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "node scripts/launch.js",
+    "dev": "node scripts/launch.js --dev",
+    "shot": "node scripts/launch.js --shot=.inspect/shot.png",
+    "panel": "node scripts/launch.js --panel-shot=.inspect/panel.png",
+    "icon": "python scripts/make_icon.py",
+    "dist": "node scripts/dist.js zh",
+    "dist:zh": "node scripts/dist.js zh",
+    "dist:en": "node scripts/dist.js en",
+    "portable": "node scripts/make_portable.js zh",
+    "portable:en": "node scripts/make_portable.js en"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^26.18.0",
+    "three": "^0.170.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ]
+  },
+  "build": {
+    "appId": "com.foxdesk.mcfoxpet",
+    "productName": "狐狸书桌",
+    "copyright": "狐狸书桌 / Fox Desk",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "asar": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "fox-desk-setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "狐狸书桌",
+      "uninstallDisplayName": "狐狸书桌",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "fox-desk-setup-${version}.${ext}"
+    }
+  }
+}

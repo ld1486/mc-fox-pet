@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>狐狸书桌</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header class="titlebar">
+  <div class="brand"><span class="fox-dot"></span><span data-i18n="app.title">狐狸书桌</span><span class="sub" data-i18n="app.sub">写作 · 聊天</span></div>
+  <div class="drag-space"></div>
+  <div class="winbtns">
+    <button id="btn-min" data-i18n-title="app.winMin" title="最小化"><svg viewBox="0 0 12 12"><path d="M2.5 6h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+    <button id="btn-close" data-i18n-title="app.winClose" title="关闭"><svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="side">
+    <button class="nav active" data-tab="write">
+      <span class="ic">✎</span>
+      <span class="tx" data-i18n="nav.write">写作</span>
+      <span class="hint" data-i18n="nav.writeHint">续写 · 润色</span>
+    </button>
+    <button class="nav" data-tab="chat">
+      <span class="ic">✉</span>
+      <span class="tx" data-i18n="nav.chat">聊天</span>
+      <span class="hint" data-i18n="nav.chatHint">帮我回消息</span>
+    </button>
+    <button class="nav" data-tab="fox">
+      <span class="ic">🦊</span>
+      <span class="tx" data-i18n="nav.fox">聊狐狸</span>
+      <span class="hint" data-i18n="nav.foxHint">和它说说话</span>
+    </button>
+    <button class="nav" data-tab="settings">
+      <span class="ic">⚙</span>
+      <span class="tx" data-i18n="nav.settings">设置</span>
+      <span class="hint" data-i18n="nav.settingsHint">API · 皮肤</span>
+    </button>
+    <div class="side-foot">
+      <p class="tip" data-i18n="nav.tip">小提示：聊微信/QQ 时，把对方的话复制下来，按 Ctrl+Shift+Space，狐狸会把回复递给你。</p>
+      <button id="summon" class="ghost" data-i18n="nav.summon">把狐狸叫出来</button>
+    </div>
+  </nav>
+
+  <main class="main">
+    <!-- ------------------------------------------------------------- write -->
+    <section class="page active" data-page="write">
+      <div class="page-head">
+        <h1 data-i18n="write.title">写点什么</h1>
+        <p data-i18n="write.sub">贴一段文字，让狐狸接着写，或者帮你改。</p>
+      </div>
+
+      <div class="write-grid">
+        <div class="card draft-card">
+          <div class="card-head">
+            <span class="label" data-i18n="write.draft">原稿</span>
+            <span class="counter" id="draft-count">0 字</span>
+            <button class="mini" id="draft-clear" data-i18n="write.clear">清空</button>
+          </div>
+          <textarea id="draft" spellcheck="false" data-i18n-ph="write.placeholder" placeholder="在这里贴入你的文字，或者直接开始写……"></textarea>
+          <div class="style-row">
+            <label for="style" data-i18n="write.style">风格</label>
+            <input id="style" type="text" data-i18n-ph="write.stylePh" placeholder="简洁自然的中文">
+          </div>
+        </div>
+
+        <div class="card out-card">
+          <div class="card-head">
+            <span class="label" data-i18n="write.out">狐狸的稿子</span>
+            <span class="streaming" id="write-status"></span>
+            <button class="mini" id="btn-stop" data-i18n="write.stop" hidden>停止</button>
+            <button class="mini" id="btn-insert" data-i18n="write.insert" hidden>插到原文后面</button>
+            <button class="mini" id="btn-copy" data-i18n="write.copy" hidden>复制</button>
+          </div>
+          <div class="out" id="out-write">
+            <div class="placeholder" data-i18n="write.idle">选一个动作，狐狸就动笔。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions" id="actions"></div>
+    </section>
+
+    <!-- -------------------------------------------------------------- chat -->
+    <section class="page" data-page="chat">
+      <div class="page-head">
+        <h1 data-i18n="chat.title">怎么回他/她</h1>
+        <p data-i18n="chat.sub">把聊天记录粘进来，狐狸给你几条能直接发出去的话。</p>
+      </div>
+
+      <div class="chat-grid">
+        <div class="card">
+          <div class="card-head">
+            <span class="label" data-i18n="chat.label">聊天内容</span>
+            <button class="mini" id="chat-paste" data-i18n="chat.paste">从剪贴板粘贴</button>
+          </div>
+          <textarea id="chat-input" spellcheck="false" data-i18n-ph="chat.placeholder" placeholder="例如：
+朋友：周末出来吃饭吗？
+我：看看时间吧
+朋友：就等你这句话了"></textarea>
+          <div class="chat-opts">
+            <label><span data-i18n="chat.persona">对方是</span>
+              <select id="persona"></select>
+            </label>
+            <label><span data-i18n="chat.count">要</span>
+              <select id="count">
+                <option>2</option>
+                <option selected>3</option>
+                <option>4</option>
+                <option>5</option>
+              </select> <span data-i18n="chat.countUnit">条</span>
+            </label>
+            <button class="primary" id="btn-suggest" data-i18n="chat.go">给我几个回复</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="label" data-i18n="chat.out">可以直接发</span>
+            <span class="streaming" id="chat-status"></span>
+            <button class="mini" id="btn-copy-all" data-i18n="chat.copyAll" hidden>全部复制</button>
+          </div>
+          <div class="replies" id="replies">
+            <div class="placeholder" data-i18n="chat.idle">回复会出现在这里。点一下就能复制。</div>
+          </div>
+          <p class="foot-note" data-i18n="chat.foot">复制后回到聊天窗口粘贴即可发送。按 Ctrl+Shift+Space 可随时唤出并自动带上剪贴板内容。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------------- fox -->
+    <section class="page" data-page="fox">
+      <div class="page-head">
+        <h1 data-i18n="fox.title">和狐狸聊聊</h1>
+        <p data-i18n="fox.sub">它是一只住在桌面上的狐狸，陪你说话、听你吐槽、帮你出主意。</p>
+      </div>
+
+      <div class="fox-wrap">
+        <div class="card talk-card">
+          <div class="card-head">
+            <span class="label" data-i18n="fox.name">小狐狸</span>
+            <button class="mini" id="fox-clear" data-i18n="fox.clear">清空</button>
+          </div>
+          <div class="talk" id="talk">
+            <div class="msg fox"><div class="who" data-i18n="fox.name">小狐狸</div><div class="body" data-i18n="fox.greeting">嗨，我是这只狐狸。今天想聊点什么？</div></div>
+          </div>
+          <div class="talk-input">
+            <textarea id="talk-input" rows="2" spellcheck="false" data-i18n-ph="fox.placeholder" placeholder="说点什么……（Enter 发送，Shift+Enter 换行）"></textarea>
+            <button class="primary" id="fox-send" data-i18n="fox.send">发送</button>
+          </div>
+          <p class="foot-note" data-i18n="fox.hint">它只会说几句话，回答也短——毕竟它主要住在桌面上。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------------------------------------------------- settings -->
+    <section class="page" data-page="settings">
+      <div class="page-head">
+        <h1 data-i18n="set.title">设置</h1>
+        <p data-i18n="set.sub">接上你自己的大模型服务，狐狸就有脑子了。</p>
+      </div>
+
+      <div class="settings-grid">
+        <div class="card">
+          <div class="card-head"><span class="label" data-i18n="set.apiCard">模型接口</span></div>
+          <div class="form">
+            <label><span data-i18n="set.base">接口地址</span>
+              <input id="api-base" type="text" placeholder="https://api.deepseek.com/v1">
+            </label>
+            <label><span data-i18n="set.model">模型名</span>
+              <div class="input-row">
+                <input id="api-model" type="text" placeholder="deepseek-chat" list="model-list" autocomplete="off">
+                <button class="ghost small" id="btn-models" type="button" data-i18n="set.find">查找</button>
+              </div>
+              <datalist id="model-list"></datalist>
+              <div class="chips" id="model-chips"></div>
+            </label>
+            <label><span data-i18n="set.key">API Key</span>
+              <input id="api-key" type="password" placeholder="sk-...">
+            </label>
+            <div class="balance-row">
+              <span class="balance-label" data-i18n="set.balance">余额</span>
+              <span class="balance-value" id="balance-value">—</span>
+              <button class="ghost small" id="btn-balance" type="button" data-i18n="set.checkBalance">查询余额</button>
+            </div>
+            <label><span data-i18n="set.temp">创意程度</span> <span class="val" id="temp-val">0.9</span>
+              <input id="api-temp" type="range" min="0" max="1.5" step="0.1">
+            </label>
+            <p class="hint" style="margin-top:-4px" data-i18n="set.tempHint">有些模型（比如 kimi-k3）不接受 temperature 参数，狐狸会自动省略它，不影响使用。</p>
+            <div class="row">
+              <button class="primary" id="btn-save" data-i18n="set.save">保存</button>
+              <button class="ghost" id="btn-test" data-i18n="set.test">测试连接</button>
+              <span class="status" id="api-status"></span>
+            </div>
+            <p class="hint" data-i18n="set.compat">兼容 OpenAI 格式的服务都可以用（DeepSeek、Kimi、通义、本地 Ollama 等）。Key 只保存在本机。</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="label" data-i18n="set.foxCard">狐狸与人</span></div>
+          <div class="form">
+            <label><span data-i18n="set.style">默认写作风格</span>
+              <input id="writing-style" type="text" placeholder="简洁自然的中文">
+            </label>
+            <label><span data-i18n="set.persona">默认聊天对象</span>
+              <select id="persona-default"></select>
+            </label>
+            <label><span data-i18n="set.lang">界面语言</span>
+              <select id="opt-lang">
+                <option value="" data-i18n="set.langAuto">跟随安装包</option>
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <label class="check"><input id="opt-hotkeys" type="checkbox"> <span data-i18n="set.hotkeys">启用全局快捷键</span></label>
+            <label class="check"><input id="opt-sound" type="checkbox"> <span data-i18n="set.sound">音效</span></label>
+            <label class="check"><input id="opt-top" type="checkbox"> <span data-i18n="set.top">狐狸始终置顶</span></label>
+            <div class="row">
+              <button class="ghost" id="btn-folder" data-i18n="set.folder">打开配置文件夹</button>
+              <span class="status" id="version"></span>
+            </div>
+            <p class="hint" data-i18n="set.hint">换皮肤、调大小、调视角、让它睡觉：在狐狸身上点右键，或者用它的工具栏。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script type="module" src="./panel.js"></script>
+</body>
+</html>
