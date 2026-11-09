@@ -20,11 +20,17 @@
 
 ![大小拖动条](docs/screenshot-size.png)
 
+![视角拖动条](docs/screenshot-view.png)
+
 ![幼崽](docs/screenshot-cub.png)
 
 ![叼着绿宝石](docs/screenshot-item.png)
 
 ![书桌](docs/screenshot-panel.png)
+
+![跟狐狸聊天](docs/screenshot-chat.png)
+
+![English UI](docs/screenshot-en.png)
 
 **书桌（写作 + 聊天）**
 
