@@ -1,5 +1,5 @@
 import * as THREE from '../vendor/three.module.min.js';
-import { buildFox } from './foxmodel.js';
+import { buildFox, pupilAtlas } from './foxmodel.js';
 import { FoxAnim } from './anim.js';
 
 const canvas = document.getElementById('scene');
@@ -51,10 +51,14 @@ function tlist(key) {
 /* Standing, sitting and sleeping poses sit very differently in space (the
  * vanilla sit lifts the head to ~19 model units), so ease the framing between
  * them instead of clipping the ears. */
+/* Per-pose framing. `off` shifts the look-at point up (positive = the model
+ * sits lower in the frame), tuned so every pose keeps its paws near the same
+ * ground line as standing — otherwise gravity buries the sitting fox and
+ * leaves the sleeper hovering. */
 const FRAMES = {
   stand: { off: 0, dist: 26, pitchOff: 0 },
-  sit: { off: 3.2, dist: 30, pitchOff: 0.03 },
-  sleep: { off: -2.0, dist: 26, pitchOff: 0.17 },
+  sit: { off: 0.4, dist: 36, pitchOff: 0.03 },
+  sleep: { off: -0.9, dist: 26, pitchOff: 0.17 },
 };
 let pitchOff = 0;
 
@@ -167,6 +171,8 @@ const LINES = {
  * window the head is nowhere near the top edge any more. */
 const anchorBox = new THREE.Box3();
 const anchorVec = new THREE.Vector3();
+let lastFeetAt = 0;
+let lastFeetFrac = 0.88;
 function anchorBubble() {
   if (!fox || !fox.root) return;
   anchorBox.setFromObject(fox.root);
@@ -277,7 +283,9 @@ const sfx = {
 let skins = [];
 let skin = null;
 let atlasTex = null;
+let atlasBase = null;
 let sleepTex = null;
+let pupilShift = 0;
 let sleeping = false;
 let blinkClosed = false;
 let foxScale = 1;
@@ -296,9 +304,13 @@ function applySkinVisual(s) {
   fox.setModel(s.model || 'adult');
   applyFoxScale();
   Promise.all([loadTexture(s.atlas), loadTexture(s.sleep)]).then(([a, sl]) => {
-    atlasTex = a;
+    /* Only the original black pupil pixels move: a canvas copy of the awake
+     * atlas repaints the eye row one pixel left / centre / right. */
+    atlasBase = a;
+    pupilShift = 0;
+    atlasTex = pupilAtlas(a, fox.model, 0);
     sleepTex = sl;
-    fox.setTexture(a);
+    fox.setTexture(atlasTex);
     document.documentElement.dataset.skin = s.id;
     skinsBox.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.skin === s.id));
   });
@@ -369,18 +381,29 @@ function showBar() {
 let lastX = 0;
 let lastY = 0;
 let hoverAt = 0;
+/* Where the mouse sits, normalised to -1..1 — drives the eyes. */
+const eyeTarget = { x: 0, y: 0 };
+const eyeCur = { x: 0, y: 0 };
+/* Dev hook: pin the pupils for screenshots, e.g. ?eyes=-1 / ?eyes=1. */
+if (camQ.has('eyes')) {
+  const v = Number(camQ.get('eyes'));
+  eyeTarget.x = Number.isFinite(v) ? v : 0;
+  eyeCur.x = eyeTarget.x;
+}
 
 addEventListener('pointermove', (e) => {
   lastX = e.clientX;
   lastY = e.clientY;
+  eyeTarget.x = (e.clientX / window.innerWidth) * 2 - 1;
+  eyeTarget.y = (e.clientY / window.innerHeight) * 2 - 1;
   const overUI = overBar(e.clientX, e.clientY);
   const overFox = hitsFox(e.clientX, e.clientY);
   setInteractive(overUI || overFox || !!pressed);
   if (interactive) showBar();
   if (overFox && !pressed) {
     // let it watch the cursor
-    const nx = (e.clientX / window.innerWidth) * 2 - 1;
-    const ny = (e.clientY / window.innerHeight) * 2 - 1;
+    const nx = eyeTarget.x;
+    const ny = eyeTarget.y;
     if (anim.state === 'stand' || anim.state === 'sit' || anim.state === 'look') {
       anim.lookTarget.yaw = THREE.MathUtils.clamp(-nx * 0.7, -0.75, 0.75);
       anim.lookTarget.pitch = THREE.MathUtils.clamp(ny * 0.45, -0.25, 0.35);
@@ -641,6 +664,18 @@ function frame() {
   }
   sleeping = anim.state === 'sleep';
 
+  /* Only the black pupil pixels move: one pixel left / centre / right inside
+   * the painted eye row, following the cursor horizontally. */
+  const eyeEase = 1 - Math.exp(-dt * 9);
+  eyeCur.x += (eyeTarget.x - eyeCur.x) * eyeEase;
+  const wantShift = Math.max(-1, Math.min(1, Math.round(-eyeCur.x * 1.8)));
+  if (atlasBase && wantShift !== pupilShift && !blinkClosed) {
+    pupilShift = wantShift;
+    atlasTex = pupilAtlas(atlasBase, fox.model, wantShift);
+    fox.material.map = atlasTex;
+    fox.material.needsUpdate = true;
+  }
+
   if (!camOverride) {
     const fr = FRAMES[anim.state] || FRAMES.stand;
     const ease = 1 - Math.exp(-dt * 2.4);
@@ -663,6 +698,28 @@ function frame() {
   shadow.position.x = fox.root.position.x;
 
   anchorBubble();
+
+  /* Tell main where the fox's lowest pixel is (as a fraction of the window)
+   * so gravity can rest every pose on the taskbar: a sitting fox sits lower
+   * than it stands, a curled-up sleeper lower still. */
+  if (performance.now() - lastFeetAt > 120) {
+    lastFeetAt = performance.now();
+    anchorBox.setFromObject(fox.root);
+    if (!anchorBox.isEmpty()) {
+      anchorVec.set(
+        (anchorBox.min.x + anchorBox.max.x) / 2,
+        anchorBox.min.y,
+        (anchorBox.min.z + anchorBox.max.z) / 2,
+      );
+      anchorVec.project(camera);
+      const frac = (1 - anchorVec.y) / 2;
+      if (Math.abs(frac - lastFeetFrac) > 0.004) {
+        lastFeetFrac = frac;
+        petAPI.setFeet(frac);
+      }
+    }
+  }
+
   renderer.render(scene, camera);
   if (camQ.has('debug') && performance.now() - lastDebug > 400) {
     lastDebug = performance.now();
@@ -670,6 +727,7 @@ function frame() {
       '[pet]',
       JSON.stringify({
         state: anim.state,
+        feet: +lastFeetFrac.toFixed(3),
         dist: +CAM.dist.toFixed(2),
         ty: +CAM.target.y.toFixed(2),
         pitch: +CAM.pitch.toFixed(2),

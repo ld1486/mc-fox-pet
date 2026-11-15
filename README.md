@@ -31,7 +31,8 @@ A Minecraft fox that lives on your desktop. It renders your own pixel textures i
 - Camera sliders (eye icon): two bars, left–right (−90°…90°) and up–down (−12°…55°), so you can look at its side or the top of its head.
 - You can drag it all the way to the top of the screen; it stays where you drop it (the window may hang off the edge, the fox never snaps back).
 - Mouth items: right-click → “Holding” and give it an emerald, raw/cooked chicken, raw rabbit, rabbit’s foot, egg or wheat. It holds the item flat in its mouth, half bitten in. The icons are the vanilla item textures fetched from blockrender.dev and converted back to 16×16 (`scripts/make_items.py` re-fetches them).
-- Optional gravity: right-click → “Drop to the taskbar”, and the fox falls until its paws hit the taskbar; dragging pauses the fall, releasing resumes it.
+- Optional gravity: right-click → “Drop to the taskbar”, and the fox falls until its paws hit the taskbar; dragging pauses the fall, releasing resumes it. Every pose rests on it — standing, sitting and curled up asleep all put their lowest point on the taskbar instead of floating or sinking.
+- Eyes that follow the mouse: the black pupil pixels slide one pixel left or right as the cursor moves across the window, on top of the head already turning toward it.
 - Right-click menu: open the desk, write something, skins, resize, view, holding, sleep / wake, gravity, sound, always on top, quit.
 
 | ![size slider](docs/screenshot-size.png) | ![camera sliders](docs/screenshot-view.png) |

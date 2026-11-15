@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('petAPI', {
   setScale: (scale) => ipcRenderer.send('set-scale', scale),
   setItem: (id) => ipcRenderer.send('set-item', id),
   setView: (view) => ipcRenderer.send('view:set', view),
+  setFeet: (frac) => ipcRenderer.send('pet:feet', frac),
   setSetting: (patch) => ipcRenderer.invoke('settings:set', patch),
   clipboard: (text) => ipcRenderer.invoke('clipboard:write', text),
 

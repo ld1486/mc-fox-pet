@@ -160,6 +160,45 @@ function itemTexture(id) {
   return tex;
 }
 
+/* The supplied art paints each eye as a single row of white-black-white
+ * pixels. Instead of redesigning the eyes we repaint just that row on a canvas
+ * copy: the band goes back to eye-white and the black pixel is drawn one pixel
+ * left, centre or right -- so only the original black pixels move. */
+const PUPIL_BAND = {
+  adult: { row: 14, bands: [[6, 8], [13, 15]], black: [10, 7, 16] },
+  pup: { row: 12, bands: [[7, 9], [16, 18]], black: [10, 7, 16] },
+};
+
+/** Canvas copy of an awake atlas with the pupils nudged by -1/0/+1 px. */
+export function pupilAtlas(tex, kind, shift) {
+  const img = tex.image;
+  if (!img || !img.width) return tex;
+  const spec = PUPIL_BAND[kind] || PUPIL_BAND.adult;
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const g = canvas.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.drawImage(img, 0, 0);
+  const [b0] = spec.bands[0];
+  const white = g.getImageData(b0, spec.row, 1, 1).data;
+  g.fillStyle = `rgb(${white[0]},${white[1]},${white[2]})`;
+  for (const [a, b] of spec.bands) g.fillRect(a, spec.row, b - a + 1, 1);
+  g.fillStyle = `rgb(${spec.black.join(",")})`;
+  const s = Math.max(-1, Math.min(1, Math.round(shift)));
+  for (const [a, b] of spec.bands) {
+    const mid = Math.round((a + b) / 2);
+    g.fillRect(mid + s, spec.row, 1, 1);
+  }
+  const out = new THREE.CanvasTexture(canvas);
+  out.colorSpace = THREE.SRGBColorSpace;
+  out.magFilter = THREE.NearestFilter;
+  out.minFilter = THREE.NearestFilter;
+  out.generateMipmaps = false;
+  out.needsUpdate = true;
+  return out;
+}
+
 export function buildFox() {
   const root = new THREE.Group();   // world placement (roaming / jump)
   const rig = new THREE.Group();    // model space, feet at y = 0 after +24
