@@ -172,7 +172,7 @@ const LINES = {
 const anchorBox = new THREE.Box3();
 const anchorVec = new THREE.Vector3();
 let lastFeetAt = 0;
-let lastFeetFrac = 0.88;
+let lastFeetPx = 0.88 * 370;
 function anchorBubble() {
   if (!fox || !fox.root) return;
   anchorBox.setFromObject(fox.root);
@@ -699,9 +699,11 @@ function frame() {
 
   anchorBubble();
 
-  /* Tell main where the fox's lowest pixel is (as a fraction of the window)
-   * so gravity can rest every pose on the taskbar: a sitting fox sits lower
-   * than it stands, a curled-up sleeper lower still. */
+  /* Tell main how far the fox's lowest pixel is from the window top, in CSS
+   * pixels, so gravity can rest every pose on the taskbar: a sitting fox sits
+   * lower than it stands, a curled-up sleeper higher. Pixels (not a fraction)
+   * keep the floor stable while Windows wobbles the window height by a few px
+   * during setPosition. */
   if (performance.now() - lastFeetAt > 120) {
     lastFeetAt = performance.now();
     anchorBox.setFromObject(fox.root);
@@ -712,10 +714,10 @@ function frame() {
         (anchorBox.min.z + anchorBox.max.z) / 2,
       );
       anchorVec.project(camera);
-      const frac = (1 - anchorVec.y) / 2;
-      if (Math.abs(frac - lastFeetFrac) > 0.004) {
-        lastFeetFrac = frac;
-        petAPI.setFeet(frac);
+      const feet = ((1 - anchorVec.y) / 2) * window.innerHeight;
+      if (Math.abs(feet - lastFeetPx) > 3) {
+        lastFeetPx = feet;
+        petAPI.setFeet(feet);
       }
     }
   }
@@ -727,7 +729,7 @@ function frame() {
       '[pet]',
       JSON.stringify({
         state: anim.state,
-        feet: +lastFeetFrac.toFixed(3),
+        feet: +lastFeetPx.toFixed(1),
         dist: +CAM.dist.toFixed(2),
         ty: +CAM.target.y.toFixed(2),
         pitch: +CAM.pitch.toFixed(2),

@@ -160,7 +160,7 @@ function createPetWindow() {
   win.on('resize', () => {
     if (win.isDestroyed() || !petSize || fixing) return;
     const b = win.getBounds();
-    if (b.width !== petSize.width || b.height !== petSize.height) {
+    if (Math.abs(b.width - petSize.width) > 3 || Math.abs(b.height - petSize.height) > 3) {
       console.log('[pet] resize guard', JSON.stringify(b), '->', petSize.width, petSize.height);
       fixing = true;
       win.setBounds({ x: b.x, y: b.y, width: petSize.width, height: petSize.height });
@@ -352,7 +352,7 @@ function startDrag() {
     if (nx !== dragInfo.px || ny !== dragInfo.py) {
       dragInfo.px = nx;
       dragInfo.py = ny;
-      petWin.setPosition(nx, ny);
+      placePet(nx, ny);
     }    const now = Date.now();
     const dt = Math.max(16, now - dragInfo.t) / 1000;
     const vx = (p.x - dragInfo.lx) / dt;
@@ -375,7 +375,7 @@ function stopDrag() {
   const [x, y] = petWin.getPosition();
   const b = petWin.getBounds();
   const clamped = clampToDisplay(x, y, b.width, b.height);
-  petWin.setPosition(clamped.x, clamped.y);
+  placePet(clamped.x, clamped.y);
   store.set({ petX: clamped.x, petY: clamped.y });
   petWin.webContents.send('pet:drag-end');
   if (store.get().gravity) setTimeout(startFall, 180);
@@ -385,17 +385,29 @@ function stopDrag() {
 /* Optional cartoon gravity: the pet drops until its paws touch the taskbar
  * (the bottom edge of the display work area, which excludes the taskbar). */
 const GRAVITY = 3400; // px / s^2
-/* Where the paws sit inside the window (0..1 from the top). The renderer keeps
- * this up to date because it changes with the pose: a sitting fox rests lower
- * than a standing one, a curled-up sleeper lower still. */
-let feetFrac = 0.88;
+/* Distance from the top of the window to the fox's lowest pixel, in DIP. The
+ * renderer measures it every frame because it changes with the pose: a sitting
+ * fox rests lower than a standing one, a curled-up sleeper higher. Keeping it
+ * in pixels (not a fraction) makes the floor immune to the 1–3 px height
+ * jitter frameless windows show on Windows. */
+let feetPx = 0.88 * PET_WIN.height;
 let fallTimer = null;
 let fallV = 0;
+
+function placePet(x, y) {
+  if (!petWin || petWin.isDestroyed()) return;
+  petWin.setBounds({
+    x: Math.round(x),
+    y: Math.round(y),
+    width: petSize.width,
+    height: petSize.height,
+  });
+}
 
 function floorYFor(win) {
   const b = win.getBounds();
   const area = screen.getDisplayMatching(b).workArea;
-  return Math.round(area.y + area.height - b.height * feetFrac);
+  return Math.round(area.y + area.height - feetPx);
 }
 
 function stopFall() {
@@ -439,7 +451,7 @@ function startFall() {
     const [x, y] = petWin.getPosition();
     const over = y - floor; // > 0: sunk below the floor (pose got taller)
     if (Math.abs(over) < 1) {
-      petWin.setPosition(x, floor);
+      placePet(x, floor);
       stopFall();
       store.set({ petX: x, petY: floor });
       if (!drift) petWin.webContents.send('pet:command', 'landed');
@@ -449,19 +461,19 @@ function startFall() {
       /* Sitting / sleeping changed where the paws are, so the fox has to be
        * lifted back out of the ground instead of falling into it. */
       const step = Math.min(over, Math.max(2, over * 0.4));
-      petWin.setPosition(x, Math.round(y - step));
+      placePet(x, Math.round(y - step));
       return;
     }
     fallV = Math.min(GRAVITY, fallV + GRAVITY * dt);
     const ny = y + fallV * dt;
     if (ny >= floor) {
-      petWin.setPosition(x, floor);
+      placePet(x, floor);
       stopFall();
       store.set({ petX: x, petY: floor });
       if (!drift) petWin.webContents.send('pet:command', 'landed');
       return;
     }
-    petWin.setPosition(x, Math.round(ny));
+    placePet(x, Math.round(ny));
   }, 16);
 }
 
@@ -774,18 +786,19 @@ function wireIpc() {
   ipcMain.on('set-skin', (_e, id) => applySkin(id));
   ipcMain.on('set-scale', (_e, s) => applyScale(s));
   ipcMain.on('set-item', (_e, id) => applyItem(id));
-  /* The renderer reports where the fox's lowest pixel is; gravity uses it so
-   * every pose (stand / sit / sleep) rests exactly on the work area. */
-  ipcMain.on('pet:feet', (_e, frac) => {
-    const f = Number(frac);
-    if (!Number.isFinite(f)) return;
-    const next = Math.max(0.5, Math.min(1.05, f));
-    if (Math.abs(next - feetFrac) < 0.002) return;
-    feetFrac = next;
+  /* The renderer reports how far the fox's lowest pixel is from the window top;
+   * gravity uses it so every pose (stand / sit / sleep) rests exactly on the
+   * work area. */
+  ipcMain.on('pet:feet', (_e, px) => {
+    const p = Number(px);
+    if (!Number.isFinite(p)) return;
+    const next = Math.max(120, Math.min(900, p));
+    if (Math.abs(next - feetPx) < 2) return;
+    feetPx = next;
     if (!store.get().gravity || dragTimer || fallTimer || !petWin || petWin.isDestroyed()) return;
-    const [x, y] = petWin.getPosition();
+    const [, y] = petWin.getPosition();
     const floor = floorYFor(petWin);
-    if (Math.abs(y - floor) > 4) setTimeout(startFall, 120);
+    if (Math.abs(y - floor) > 8) setTimeout(startFall, 140);
   });
   ipcMain.on('pet:command', (_e, cmd) => {
     if (cmd === 'open-panel') openPanel('write');
@@ -872,7 +885,7 @@ function runDragSim() {
   setTimeout(() => {
     const area = screen.getDisplayMatching(petWin.getBounds()).workArea;
     const b = petWin.getBounds();
-    petWin.setPosition(Math.round(area.x + (area.width - b.width) / 2), Math.round(area.y + area.height - b.height * 0.88));
+    placePet(Math.round(area.x + (area.width - b.width) / 2), Math.round(area.y + area.height - b.height * 0.88));
     const wb = petWin.getBounds();
     const start = { x: Math.round(wb.x + wb.width * 0.5), y: Math.round(wb.y + wb.height * 0.5) };
     console.log('[simdrag] window', JSON.stringify(wb), 'cursor', JSON.stringify(start));
